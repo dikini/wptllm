@@ -1,0 +1,45 @@
+# Copy this file into an individual experiment and replace every <placeholder>.
+
+experiment:
+  name: <experiment-name>
+  track: feature-space-compilation
+  seed: <integer>
+  output_dir: results/<run-name>
+
+model:
+  id: <organization/model>
+  revision: <immutable-revision>
+  tokenizer_revision: <immutable-revision>
+  source_format: safetensors
+  dtype: bfloat16
+
+data:
+  id: <organization/dataset-or-local-fixture>
+  revision: <immutable-revision-or-checksum>
+  split: <split>
+  selection_rule: <documented-sampling-rule>
+  max_examples: <integer>
+  max_sequence_length: <integer>
+
+transform:
+  family: <identity|permutation|haar|wpt>
+  orthonormal: true
+  feature_width_policy: <full|grouped>
+  group_width: <integer-or-null>
+  block_layout: <description>
+
+evaluation:
+  fixed_input_fixture: <path-or-identifier>
+  metrics:
+    - max_abs_logit_difference
+    - mean_abs_logit_difference
+    - nll
+    - perplexity
+    - off_block_energy
+  acceptance_criteria: <link-to-experiment-md-section-or-declared-rule>
+
+environment:
+  device: <device>
+  torch_version: <version>
+  transformers_version: <version>
+  python_version: <version>
