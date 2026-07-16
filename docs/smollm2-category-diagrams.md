@@ -57,12 +57,10 @@ $L_\ell:H_T\to H_T$. It therefore maps both objects and arrows.
 ```tikz
 \usepackage{tikz-cd}
 \begin{document}
-\[
 \begin{tikzcd}[column sep=large, row sep=large]
 \ell \arrow[r, "\text{in }\mathbf L_{24}"] \arrow[d, "\mathcal H"'] & \ell+1 \arrow[d, "\mathcal H"] \\
 H_T \arrow[r, "L_\ell"'] & H_T
 \end{tikzcd}
-\]
 \end{document}
 ```
 
@@ -209,12 +207,10 @@ then applies the prefix layer map.
 ```tikz
 \usepackage{tikz-cd}
 \begin{document}
-\[
 \begin{tikzcd}[column sep=large, row sep=large]
 H_T \arrow[r, "L_\ell^{(T)}"] \arrow[d, "r_t"'] & H_T \arrow[d, "r_t"] \\
 H_t \arrow[r, "L_\ell^{(t)}"'] & H_t
 \end{tikzcd}
-\]
 \end{document}
 ```
 
@@ -249,12 +245,10 @@ exact compilation.
 ```tikz
 \usepackage{tikz-cd}
 \begin{document}
-\[
 \begin{tikzcd}[column sep=large, row sep=large]
 H_T \arrow[r, "L_\ell"] \arrow[d, "\eta^S_\ell=S_T"'] & H_T \arrow[d, "\eta^S_{\ell+1}=S_T"] \\
 H_T^S \arrow[r, "L_\ell^S"'] & H_T^S
 \end{tikzcd}
-\]
 \end{document}
 ```
 

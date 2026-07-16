@@ -40,6 +40,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - Replaced Mermaid-sensitive mathematical punctuation in SmolLM2 diagram labels
   with plain-language labels that render in VS Code Markdown Preview.
+- Removed display-math wrappers from `tikz-cd` blocks to match TikZJax's
+  documented Markdown block form.
 
 ## [0.1.0] - 2026-07-15
 

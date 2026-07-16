@@ -66,4 +66,3 @@ Re-run the content check; verify each `tikz` block contains
 delimiters remain VS Code-compatible, and `git diff --check` passes. Inspect
 the rendered preview in VS Code. Commit the note and changelog with message
 `docs: add symbolic Transformer diagrams`.
-
