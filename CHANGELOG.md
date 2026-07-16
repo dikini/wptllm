@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 - Design record for an editable SmolLM2-1.7B category-diagram reference.
+- Category-theory-style SmolLM2-1.7B architecture and WPT commutation diagrams.
 
 - Project guidance for reproducible, documented, cost-aware WPT-LLM research.
 - Separate experiment plans for feature-space WPT checkpoint compilation and
