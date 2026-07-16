@@ -31,12 +31,12 @@ Here $L_\ell$ is the complete decoder map at layer $\ell$. The token vocabulary 
 ```mermaid
 flowchart LR
   tok[Token IDs]
-  emb[Embedding W_E]
-  h0[Residual stream H_0]
-  layers[Layer-state functor: L_0 through L_23]
-  h24[Residual stream H_24]
+  emb[Embedding]
+  h0[Initial residual stream]
+  layers[Twenty four decoder layers]
+  h24[Final residual stream]
   norm[Final RMSNorm]
-  head[Tied LM head W_H = W_E transpose]
+  head[Tied LM head]
   softmax[Softmax]
   probs[Token probability simplex]
   tok --> emb --> h0 --> layers --> h24 --> norm --> head --> softmax --> probs
@@ -69,7 +69,7 @@ flowchart LR
   qkv[Q, K, V projections]
   rope[RoPE on Q and K]
   attn[Causal self-attention]
-  wo[Output projection W_O]
+  wo[Output projection]
   add1[Add input residual]
   u[Intermediate residual u]
   n2[Pre-MLP RMSNorm]
@@ -77,7 +77,7 @@ flowchart LR
   swiglu[SwiGLU]
   down[Down projection]
   add2[Add intermediate residual]
-  out[Output residual L_l(h)]
+  out[Output residual]
   h --> n1 --> qkv --> rope --> attn --> wo --> add1 --> u
   h --> add1
   u --> n2 --> gu --> swiglu --> down --> add2 --> out
@@ -105,10 +105,10 @@ Let $r_t:H_T\to H_t$ retain the first $t$ positions. For a causal decoder map, t
 
 ```mermaid
 flowchart TB
-  HT[H_T: length T residuals] -->|L_l^(T)| HTp[H_T: next-layer residuals]
-  HT -->|r_t| Ht[H_t: prefix residuals]
-  HTp -->|r_t| Htp[H_t: prefix next-layer residuals]
-  Ht -->|L_l^(t)| Htp
+  HT[Full sequence residuals] -->|Layer map at full length| HTp[Next layer full sequence]
+  HT -->|Prefix restriction| Ht[Prefix residuals]
+  HTp -->|Prefix restriction| Htp[Next layer prefix]
+  Ht -->|Layer map at prefix length t| Htp
 ```
 
 It commutes when
@@ -143,10 +143,10 @@ $$
 
 ```mermaid
 flowchart TB
-  H0[H_l: original residual coordinates] -->|L_l| H1[H_(l+1): original residual coordinates]
-  H0 -->|eta_l^S = S_T| HS0[H_l^S: WPT coordinates]
-  H1 -->|eta_(l+1)^S = S_T| HS1[H_(l+1)^S: WPT coordinates]
-  HS0 -->|L_l^S| HS1
+  H0[Layer l original residuals] -->|Layer map| H1[Next layer original residuals]
+  H0 -->|WPT coordinate map| HS0[Layer l WPT residuals]
+  H1 -->|WPT coordinate map| HS1[Next layer WPT residuals]
+  HS0 -->|Compiled layer map| HS1
 ```
 
 This diagram describes the target of exact coordinate compilation. Actual implementations must establish the approximation quality numerically, including fixed-input logits and loss/perplexity differences at the stated precision.
@@ -191,10 +191,10 @@ $$
 
 ```mermaid
 flowchart TB
-  HT[H_T: original features] -->|S_T| HST[H_T: WPT features]
-  HT -->|r_t| Ht[H_t: original prefix]
-  HST -->|r_t| HSt[H_t: WPT prefix]
-  Ht -->|S_t| HSt
+  HT[Full sequence original features] -->|Feature WPT| HST[Full sequence WPT features]
+  HT -->|Prefix restriction| Ht[Original prefix]
+  HST -->|Prefix restriction| HSt[WPT prefix]
+  Ht -->|Feature WPT| HSt
 ```
 
 Consequently, a feature-axis WPT does not relax the checkpoint's ordinary causal mask. A sequence-axis WPT or hierarchical block-causal method is a separate architectural proposal: it mixes positions and is not automatically causal, so its mask and generation semantics must be specified and tested independently.

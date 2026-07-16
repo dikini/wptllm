@@ -31,6 +31,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Reframed the WPT theory note around near block-diagonal structure, quality
   preservation, performance optimization, and localized continuous learning.
 
+### Fixed
+
+- Replaced Mermaid-sensitive mathematical punctuation in SmolLM2 diagram labels
+  with plain-language labels that render in VS Code Markdown Preview.
+
 ## [0.1.0] - 2026-07-15
 
 ### Added
