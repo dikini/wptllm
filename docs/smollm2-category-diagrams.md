@@ -26,6 +26,52 @@ $$
 
 Here $L_\ell$ is the complete decoder map at layer $\ell$. The token vocabulary can be regarded as a discrete category for diagrammatic purposes, but the learned embedding is most usefully treated as a map from one-hot token representations to $H_T$.
 
+## Reading the model diagrams
+
+The **residual stream** is the model's running representation: one feature row
+per token. At a sequence length $T$, it is $h\in H_T=\mathbb{R}^{T\times2048}$.
+Each decoder sublayer computes an update and adds it back to this running
+representation. In generic form, this is $h_{\mathrm{next}}=h+\Delta(h)$.
+
+| Term / meaning | Diagram label | Symbol / equation |
+| --- | --- | --- |
+| Residual stream: the current features for every token | Input, intermediate, or output residual | $h,u,h_{\ell+1}\in H_T$ |
+| Residual connection: retain the old features while adding an update | Add input residual; Add intermediate residual | $h_{\mathrm{next}}=h+\Delta(h)$ |
+| RMSNorm: rescales a feature vector to keep magnitudes stable | Pre-attention RMSNorm; Pre-MLP RMSNorm | $x=\operatorname{RMSNorm}(h)$ |
+| Projection: a learned linear change of features | Q, K, V projections; Output projection | $xW$ |
+| Q/K/V: queries ask, keys describe, and values carry information | Q, K, V projections | $Q=xW_q$, $K=xW_k$, $V=xW_v$ |
+| Attention: mixes earlier token values according to query--key similarity | Causal self-attention | $\operatorname{Attn}_{\mathrm{causal}}(Q,K,V)$ |
+| RoPE: position-dependent rotations applied to queries and keys | RoPE on Q and K | $\operatorname{RoPE}(Q),\operatorname{RoPE}(K)$ |
+| Causal mask: prevents a position from reading future positions | Causal self-attention | attention weights for positions $j>i$ are masked |
+| MLP: a per-token nonlinear feature transformation | Gate and up projections; Down projection | $\operatorname{MLP}(u)$ |
+| SwiGLU: the MLP's gated nonlinearity | SwiGLU | $\operatorname{SiLU}(a)\odot b$ |
+| Logits: unnormalized scores for the next token | Tied LM head | $zW_H$ |
+| Category: named spaces together with permitted maps between them | Not shown as a process box | $\mathbf{DiffVec}_{\mathbb{R}}$ |
+| Functor: maps layer indices and layer arrows into spaces and decoder maps | Layer-state functor | $\mathcal{H}:\mathbf{L}_{24}\to\mathbf{DiffVec}_{\mathbb{R}}$ |
+| Natural transformation: the same coordinate change at every layer, compatible with layer maps | WPT coordinate map | $\eta^S:\mathcal{H}\Rightarrow\mathcal{H}^S$ |
+
+The following symbolic square reads as: the functor $\mathcal{H}$ maps the
+layer-index arrow $\ell\to\ell+1$ to the decoder-layer map
+$L_\ell:H_T\to H_T$. It therefore maps both objects and arrows.
+
+```tikz
+\usepackage{tikz-cd}
+\begin{document}
+\[
+\begin{tikzcd}[column sep=large, row sep=large]
+\ell \arrow[r, "\text{in }\mathbf L_{24}"] \arrow[d, "\mathcal H"'] & \ell+1 \arrow[d, "\mathcal H"] \\
+H_T \arrow[r, "L_\ell"'] & H_T
+\end{tikzcd}
+\]
+\end{document}
+```
+
+$$
+\mathcal{H}(\ell)=H_T,
+\qquad
+\mathcal{H}(\ell\to\ell+1)=L_\ell.
+$$
+
 ## Whole model
 
 ```mermaid
@@ -84,6 +130,45 @@ flowchart LR
   u --> add2
 ```
 
+This companion diagram makes the two residual additions explicit: each update
+takes a normalized copy of the stream, while the unchanged stream enters the
+same addition node.
+
+```tikz
+\begin{document}
+\begin{tikzpicture}[>=stealth]
+  \node (h) at (0, 0) {$h$};
+  \node[draw, rounded corners] (norm1) at (2, 0) {$\operatorname{RMSNorm}_{\ell,1}$};
+  \node[draw, rounded corners] (attn) at (5, 0) {$\Delta_{\mathrm{attn}}(h)$};
+  \node[draw, circle] (plus1) at (8, 0) {$+$};
+  \node (u) at (9.5, 0) {$u$};
+  \node[draw, rounded corners] (norm2) at (12, 0) {$\operatorname{RMSNorm}_{\ell,2}$};
+  \node[draw, rounded corners] (mlp) at (15, 0) {$\Delta_{\mathrm{mlp}}(u)$};
+  \node[draw, circle] (plus2) at (18, 0) {$+$};
+  \node (hout) at (19.5, 0) {$h_{\ell+1}$};
+  \draw[->] (h) -- (norm1);
+  \draw[->] (norm1) -- (attn);
+  \draw[->] (attn) -- (plus1);
+  \draw[->] (h) to[bend left=18] (plus1);
+  \draw[->] (plus1) -- (u);
+  \draw[->] (u) -- (norm2);
+  \draw[->] (norm2) -- (mlp);
+  \draw[->] (mlp) -- (plus2);
+  \draw[->] (u) to[bend right=18] (plus2);
+  \draw[->] (plus2) -- (hout);
+\end{tikzpicture}
+\end{document}
+```
+
+$$
+u=h+\Delta_{\mathrm{attn}}(h),
+\qquad
+h_{\ell+1}=u+\Delta_{\mathrm{mlp}}(u).
+$$
+
+In the detailed equation below, $\Delta_{\mathrm{attn}}(h)=aW_{o,\ell}$ and
+$\Delta_{\mathrm{mlp}}(u)=\bigl(\operatorname{SiLU}(yW_{\mathrm{gate},\ell})\odot(yW_{\mathrm{up},\ell})\bigr)W_{\mathrm{down},\ell}$.
+
 For layer $\ell$, suppressing sequence and head reshapes, let
 
 $$
@@ -117,6 +202,22 @@ $$
 r_t\circ L_\ell^{(T)} = L_\ell^{(t)}\circ r_t.
 $$
 
+The symbolic version uses the same spaces and arrows: either route first
+applies the full/prefix layer map and then restricts, or first restricts and
+then applies the prefix layer map.
+
+```tikz
+\usepackage{tikz-cd}
+\begin{document}
+\[
+\begin{tikzcd}[column sep=large, row sep=large]
+H_T \arrow[r, "L_\ell^{(T)}"] \arrow[d, "r_t"'] & H_T \arrow[d, "r_t"] \\
+H_t \arrow[r, "L_\ell^{(t)}"'] & H_t
+\end{tikzcd}
+\]
+\end{document}
+```
+
 This is a statement about causal position computation, not a claim that the layer is linear or time-invariant.
 
 ## Feature-space WPT as a natural coordinate change
@@ -140,6 +241,22 @@ Its naturality condition for each decoder edge is the coordinate-change equation
 $$
 S_T\circ L_\ell=L_\ell^S\circ S_T.
 $$
+
+The symbolic naturality square says that converting coordinates before or after
+the corresponding layer gives the same WPT-coordinate result in the ideal
+exact compilation.
+
+```tikz
+\usepackage{tikz-cd}
+\begin{document}
+\[
+\begin{tikzcd}[column sep=large, row sep=large]
+H_T \arrow[r, "L_\ell"] \arrow[d, "\eta^S_\ell=S_T"'] & H_T \arrow[d, "\eta^S_{\ell+1}=S_T"] \\
+H_T^S \arrow[r, "L_\ell^S"'] & H_T^S
+\end{tikzcd}
+\]
+\end{document}
+```
 
 ```mermaid
 flowchart TB
@@ -207,4 +324,4 @@ Consequently, a feature-axis WPT does not relax the checkpoint's ordinary causal
 
 ## Viewing in VS Code
 
-Modern VS Code Markdown Preview renders Mermaid fenced blocks. If a local build does not, install a Mermaid-capable Markdown Preview extension; the surrounding equations use standard `$...$` and `$$...$$` delimiters supported by the normal Markdown math workflow.
+Modern VS Code Markdown Preview renders Mermaid fenced blocks. The installed TikZJax / TikZ in Markdown extension renders the `tikz` fences in this note and supports `tikz-cd` for the commutative squares. The surrounding equations use standard `$...$` and `$$...$$` delimiters supported by the normal Markdown math workflow.
