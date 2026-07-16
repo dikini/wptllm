@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Category-theory-style SmolLM2-1.7B architecture and WPT commutation diagrams.
 - Design record for a terminology glossary that connects the diagrams to their
   equations.
+- Design record for symbolic TikZ companions to the SmolLM2 process diagrams.
 
 - Project guidance for reproducible, documented, cost-aware WPT-LLM research.
 - Separate experiment plans for feature-space WPT checkpoint compilation and
