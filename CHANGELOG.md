@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Design record for an editable SmolLM2-1.7B category-diagram reference.
 
 - Project guidance for reproducible, documented, cost-aware WPT-LLM research.
 - Separate experiment plans for feature-space WPT checkpoint compilation and
@@ -24,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Added a critical LMWT related-work note, evaluation implications, and paper
+  reference to the wavelet packet transform chapter.
 - Reframed the WPT theory note around near block-diagonal structure, quality
   preservation, performance optimization, and localized continuous learning.
 
