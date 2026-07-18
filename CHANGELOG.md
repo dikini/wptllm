@@ -46,6 +46,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   and residual diagrams with basic math-mode labels.
 - Corrected the residual-diagram shorthand so each attention and MLP update
   explicitly consumes its normalized input.
+- Added explicit $x$ and $y$ nodes after the two RMSNorm operations in the
+  residual diagram.
 
 ## [0.1.0] - 2026-07-15
 
