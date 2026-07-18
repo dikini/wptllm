@@ -32,6 +32,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Expanded the SmolLM2 diagram reference with operational fold/unfold/build
+  and reverse-mode automatic-differentiation explanations of training and
+  generation.
 - Expanded the SmolLM2 diagram reference with a causal training and
   autoregressive-generation explanation.
 - Expanded the SmolLM2 category-diagram reference with a beginner-oriented

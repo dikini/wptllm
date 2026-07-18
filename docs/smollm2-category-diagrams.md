@@ -190,6 +190,131 @@ In short, training and generation share the same causal model and mask.
 Training uses dataset targets, losses, gradients, and updates; generation uses
 selected and appended tokens, with no updates.
 
+### Fold, unfold, and build
+
+These words provide an operational way to read the two processes. During
+training, the known token sequence lets the causal predictor produce one loss
+$\ell_t$ at every predicted position. A **fold** combines that collection of
+per-token losses into one scalar objective, usually by a sum or mean. Because
+each layer has its own parameters but reuses them at every token position, the
+per-position gradient contributions sum or average for that layer's shared
+parameters. Explicitly tied parameters, such as tied embeddings and the LM
+head, likewise receive contributions from every use.
+
+During generation, the current prefix is the state. One causal forward pass
+and a selection rule emit a next token; **build** appends that token to form the
+next prefix. An **unfold** repeats this state transition until the stop token
+or length limit is reached. The causal predictor is the same in both cases:
+training is given the next token by the dataset, while generation selects and
+appends it.
+
+```mermaid
+flowchart TB
+  subgraph train[Training]
+    known[Known token sequence] --> losses[Per token losses]
+    losses --> fold[Fold into loss]
+    fold --> update[Gradient update]
+  end
+  subgraph generate[Generation]
+    prefix[Current prefix] --> predict[Predict token]
+    predict --> build[Build next prefix]
+    build --> unfold[Unfold repeat]
+    unfold --> prefix
+  end
+```
+
+For a mean reduction, the training fold can be written as
+
+$$
+\ell_t(\Theta)=-\log p_\Theta(x_{t+1}\mid x_{1:t}),
+\qquad
+\mathcal{L}(\Theta)=\frac{1}{T}\sum_{t=1}^{T}\ell_t(\Theta).
+$$
+
+The generation state transition is
+
+$$
+s_t=x_{1:t},
+\qquad
+\hat{x}_{t+1}=\operatorname{Select}_q\!\left(p_\Theta(\cdot\mid s_t)\right),
+\qquad
+s_{t+1}=\operatorname{Build}(s_t,\hat{x}_{t+1}).
+$$
+
+### No magic: reverse-mode automatic differentiation
+
+The forward model is a composition of ordinary operations. In schematic form,
+it computes
+
+$$
+h_0 \xrightarrow{f_1} h_1 \xrightarrow{f_2} \cdots
+\xrightarrow{f_n} h_n \xrightarrow{\ell} \mathcal{L}.
+$$
+
+The forward pass records, or later recomputes, the intermediate values needed
+by the local derivatives. Saving fewer values and recomputing some of them is
+an implementation memory optimization often called checkpointing; it does not
+change the derivative being computed. Reverse-mode automatic differentiation
+then traverses the same operations in reverse.
+
+```tikz
+\begin{document}
+\begin{tikzpicture}[>=stealth]
+  \node (h0) at (0, 0) {$h_0$};
+  \node[draw, rounded corners] (f1) at (2, 0) {$f_1$};
+  \node (h1) at (4, 0) {$h_1$};
+  \node[draw, rounded corners] (fn) at (7, 0) {$f_n$};
+  \node (hn) at (9, 0) {$h_n$};
+  \node[draw, rounded corners] (ell) at (11, 0) {$\ell$};
+  \node (loss) at (13, 0) {$\mathcal{L}$};
+  \draw[->] (h0) -- (f1);
+  \draw[->] (f1) -- (h1);
+  \draw[->] (h1) -- (fn);
+  \draw[->] (fn) -- (hn);
+  \draw[->] (hn) -- (ell);
+  \draw[->] (ell) -- (loss);
+  \draw[<-] (h0) to[bend left=35] node[above] {$\bar h_0$} (f1);
+  \draw[<-] (f1) to[bend left=35] node[above] {$\mathrm{VJP}$} (h1);
+  \draw[<-] (h1) to[bend left=35] node[above] {$\bar h_1$} (fn);
+  \draw[<-] (fn) to[bend left=35] node[above] {$\mathrm{VJP}$} (hn);
+  \draw[<-] (hn) to[bend left=35] node[above] {$\bar h_n$} (ell);
+  \draw[<-] (ell) to[bend left=35] node[above] {$\bar{\mathcal L}=1$} (loss);
+\end{tikzpicture}
+\end{document}
+```
+
+The initial reverse signal, read as “bar L,” is
+
+$$
+\bar{\mathcal{L}}=1.
+$$
+
+At each operation $f_i$, automatic differentiation applies its local
+**vector-Jacobian product** (VJP), accumulating both the signal for its input
+and the signal for its parameters:
+
+$$
+(\bar h_{i-1},\bar\theta_i)
+\mathrel{+}=\operatorname{VJP}_{f_i}
+\left(h_{i-1},\theta_i;\bar h_i\right).
+$$
+
+These local chain-rule actions compose in reverse to give exactly
+$\nabla_\Theta\mathcal{L}$; there is no separate learning-magic operation.
+For a concrete final local operation, with logits $z$, probabilities
+$p=\operatorname{softmax}(z)$, and one-hot target $e_y$, softmax-cross-entropy
+has
+
+$$
+\frac{\partial\ell}{\partial z}=p-e_y.
+$$
+
+Each token supplies such a local loss gradient. They accumulate through the
+shared model parameters into $\nabla_\Theta\mathcal{L}$, after which the
+existing optimizer applies its update. Ordinary generation runs the forward
+graph only: it records no gradients and performs no back-propagation or
+optimizer update.
+
 ## One pre-norm decoder layer
 
 ```mermaid
