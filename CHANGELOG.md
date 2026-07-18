@@ -33,6 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Expanded the SmolLM2 diagram reference with paired pseudo-functional
+  programs and equations for teacher-forced training, generation, and
+  reverse-mode automatic differentiation.
 - Expanded the SmolLM2 diagram reference with operational fold/unfold/build
   and reverse-mode automatic-differentiation explanations of training and
   generation.

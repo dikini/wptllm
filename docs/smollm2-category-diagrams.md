@@ -241,6 +241,106 @@ s_t=x_{1:t},
 s_{t+1}=\operatorname{Build}(s_t,\hat{x}_{t+1}).
 $$
 
+### Programs and equations
+
+The following language-neutral pseudocode is an operational reading of the
+equations, not executable library code. The equations remain the precise
+definition; names such as `map`, `mean`, `fold`, and `unfold` make the data
+flow explicit.
+
+For teacher-forced training, take a dataset sequence
+$\mathrm{tokens}=(x_1,\ldots,x_{T+1})$. The inputs
+`tokens[0:-1]` are $x_{1:T}$ and the supplied shifted targets `tokens[1:]`
+are $x_{2:T+1}$. The model predicts at every position in parallel under the
+causal mask; it does not generate those targets.
+
+```text
+teacherForcedLoss(theta, tokens):
+  logits = causalForward(theta, tokens[0:-1])
+  shiftedTargets = tokens[1:]
+  losses = map((logitsAtPosition, target) ->
+                 crossEntropy(logitsAtPosition, target),
+               zip(logits, shiftedTargets))
+  return mean(losses)              # equivalently: fold(+, losses) / count(losses)
+
+trainStep(theta, tokens, optimizer):
+  loss, gradTheta = valueAndGrad(theta -> teacherForcedLoss(theta, tokens), theta)
+  return optimizerStep(optimizer, theta, gradTheta), loss
+```
+
+Here the `map` produces the per-position terms and the `mean` is the loss
+fold. In the notation used above, this program computes
+
+$$
+\mathcal{L}(\Theta)
+=-\frac{1}{T}\sum_{t=1}^{T}
+  \log p_\Theta(x_{t+1}\mid x_{1:t}).
+$$
+
+Generation instead unfolds a changing prefix. The selection policy
+`selectQ` may be greedy or stochastic, but ordinary generation keeps
+$\Theta$ fixed and never calls an optimizer.
+
+```text
+step(theta, prefix):
+  logits = causalForward(theta, prefix)
+  nextToken = selectQ(softmax(last(logits)))
+  return append(prefix, nextToken)
+
+generate(theta, prompt, stop, maxNewTokens):
+  return unfoldUntil(prefix -> step(theta, prefix),
+                     prompt,
+                     prefix -> stop(last(prefix))
+                               or generatedCount(prefix, prompt) == maxNewTokens)
+```
+
+`unfoldUntil` returns the sequence of prefixes, including the initial prompt
+and the terminal prefix that first satisfies its predicate. The state in this
+program is the prefix $s_t=x_{1:t}$, and its transition is
+
+$$
+s_{t+1}=\operatorname{Build}\!\left(
+  s_t,
+  \operatorname{Select}_q\!\left(p_\Theta(\cdot\mid s_t)\right)
+\right).
+$$
+
+`valueAndGrad` can itself be understood as a transformation of the forward
+loss program. Conceptually, it makes a forward trace, seeds an adjoint map at
+the scalar loss with $1$, and reverse-folds local vector--Jacobian products
+(VJPs). Implementations may record intermediates, recompute them, or use a
+framework tape; this pseudocode is an explanation rather than a literal API.
+
+```text
+valueAndGrad(lossFunction, theta):
+  loss, trace = forwardTrace(lossFunction, theta)
+  adjoints = {loss: 1}
+  adjoints = reverseFold(accumulateVjpAdjoints, adjoints, reverse(trace))
+  return loss, adjoints[theta]
+
+accumulateVjpAdjoints(adjoints, operation):
+  outputAdjoint = adjoints[operation.output]
+  inputAdjoints, parameterAdjoints = vjp(operation, outputAdjoint)
+  for input, inputAdjoint in zip(operation.inputs, inputAdjoints):
+    adjoints[input] += inputAdjoint
+  for parameter, parameterAdjoint in zip(operation.parameters, parameterAdjoints):
+    adjoints[parameter] += parameterAdjoint
+  return adjoints
+```
+
+For a recorded operation $h_i=f_i(h_{i-1},\theta_i)$, the corresponding local
+reverse step is exactly the VJP relation used below:
+
+$$
+(\bar h_{i-1},\bar\theta_i)
+\mathrel{+}=
+\operatorname{VJP}_{f_i}(h_{i-1},\theta_i;\bar h_i).
+$$
+
+The explicit `+=` is essential: a shared parameter is used by many operations
+(for example, at multiple token positions), so each use contributes a local
+gradient term to the same entry in `adjoints[theta]`.
+
 ### No magic: reverse-mode automatic differentiation
 
 The forward model is a composition of ordinary operations. In schematic form,
