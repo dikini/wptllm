@@ -36,6 +36,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Added an illustrative WPT best-basis example that combines normalized
+  cross-block energy, calibration KL, and block-size costs while keeping
+  held-out true KL outside the search objective.
+- Expanded the WPT chapter with derived additive proxy costs for declared
+  packet-block masking, including off-block energy, output-KL, and retention
+  examples with their calibration and held-out evaluation boundaries.
+- Reorganized the wavelet-packet reference chapter around the WPT intuition,
+  worked Haar packet example, LLM tensor axes, experimental decision gates, and
+  explicit limits of what coordinate compilation alone establishes.
 - Reorganized the SmolLM2 diagram note as a data-to-computation-to-geometry
   teaching narrative, with explicit token/feature spaces and axis meanings.
 - Expanded the SmolLM2 diagram reference with paired pseudo-functional

@@ -2,15 +2,24 @@
 
 ## Purpose and scope
 
-This chapter introduces wavelets as the foundation for the **Wavelet Packet
-Transform** (WPT), then focuses on the properties of WPT that matter for this
-project: localized subspaces, selectable bases, multichannel signals,
-best-basis optimization, and structured coordinate systems.
+This chapter starts from the practical intuition behind the **Wavelet Packet
+Transform** (WPT): it is a structured change of coordinates that can divide a
+signal into localized subspaces at several resolutions. The hope in this project
+is not that a transform makes an LLM inherently better, but that a well-chosen
+coordinate system may reveal approximately independent blocks in its activations
+or operators. Those blocks could later make approximation, local adaptation, or
+specialized kernels more practical.
+
+The reading path is deliberate: first see the difference between an ordinary
+wavelet transform and a packet tree, then work through a small Haar example,
+then connect basis selection to the axes of LLM tensors and to the project's
+separate experiments. It is intended as a self-contained introduction and as a
+reference for the experiment records.
 
 The WPT is not universally better than other transforms. It is a constrained
-library of localized bases. Its value appears when that library contains a basis
-that makes a signal or operator more concentrated, less coupled, or easier to
-approximate than suitable controls.
+library of localized bases. Its value appears only when that library contains a
+basis that makes a signal or operator more concentrated, less coupled, or
+easier to approximate than suitable controls.
 
 For this project, the question is:
 
@@ -18,6 +27,12 @@ $$
 \text{Does a declared WPT basis reveal useful structure without unacceptable
 loss of model quality?}
 $$
+
+The answer cannot be assumed from the transform alone. Exact orthogonal
+re-expression preserves information, but does **not** prove sparsity,
+near-block-diagonality, preserved finite-precision model outputs, speedup, or
+safer continual learning. Each is a separate empirical claim with its own
+baseline and evaluation.
 
 ## 1. Signals, bases, and coordinate changes
 
@@ -110,6 +125,42 @@ transparent and has minimal local support, making it a strong first experimental
 baseline. Smoother wavelets trade longer support for smoother basis functions
 and more vanishing moments.
 
+For four samples, first form two local averages and differences:
+
+$$
+a_0=\frac{x_0+x_1}{\sqrt2},\quad d_0=\frac{x_0-x_1}{\sqrt2},\qquad
+a_1=\frac{x_2+x_3}{\sqrt2},\quad d_1=\frac{x_2-x_3}{\sqrt2}.
+$$
+
+The second DWT level splits only the approximation pair:
+
+$$
+a_{\mathrm a}=\frac{a_0+a_1}{\sqrt2},\qquad
+a_{\mathrm d}=\frac{a_0-a_1}{\sqrt2}.
+$$
+
+Its four coefficients are therefore $\{a_{\mathrm a},a_{\mathrm d},d_0,d_1\}$. A full level-two
+packet tree also splits the detail pair:
+
+$$
+d_{\mathrm a}=\frac{d_0+d_1}{\sqrt2},\qquad
+d_{\mathrm d}=\frac{d_0-d_1}{\sqrt2}.
+$$
+
+The packet representation
+$\{a_{\mathrm a},a_{\mathrm d},d_{\mathrm a},d_{\mathrm d}\}$ contains the same number of
+coefficients and the same information, but it offers a different set of local
+subspaces. This small example is the essential WPT move: detail content is
+allowed to have its own multi-resolution structure instead of being treated as
+one terminal remainder.
+
+Reconstruction simply reverses the same local operations. For example,
+$a_0=(a_{\mathrm a}+a_{\mathrm d})/\sqrt2$ and
+$d_0=(d_{\mathrm a}+d_{\mathrm d})/\sqrt2$, after which
+$x_0=(a_0+d_0)/\sqrt2$ and $x_1=(a_0-d_0)/\sqrt2$. The other pair is recovered
+in the same way. This exact inverse is why the packet tree can be used as a
+coordinate system before any approximation is introduced.
+
 ## 4. Wavelet packet transform (WPT)
 
 The WPT generalizes the DWT by allowing **both** children of every node to be
@@ -138,7 +189,8 @@ the approximation branch.
 
 For an orthonormal packet filter bank, every complete pruning preserves total
 energy and permits exact reconstruction. This comparability enables best-basis
-selection [2].
+selection [2]. A basis is a pruning, not necessarily the fully expanded tree:
+one may retain a parent where its children offer no useful extra structure.
 
 ```text
 DWT: decompose the low-pass branch repeatedly.
@@ -222,6 +274,205 @@ important but generally not additive over tree leaves. Use an additive proxy to
 generate candidate bases, then evaluate the full global objective on held-out
 data. Do not claim the classical best-basis optimum for a non-additive objective.
 
+### From a global objective to an additive proxy
+
+The following recipe turns a global objective into a best-basis *candidate
+generator*. Let a pruning $\mathcal L$ define disjoint coordinate blocks, with
+$P_v$ the diagonal projector onto the coordinates in leaf $v$. First declare
+the approximation that the pruning will enable, and write its true objective as
+$G(\mathcal L)$. Next, assign to every possible leaf a calibration cost $C(v)$
+that estimates its local contribution, and search with
+
+$$
+\widetilde G(\mathcal L)=\sum_{v\in\mathcal L} C(v).
+$$
+
+Finally, run the selected approximation and measure $G(\mathcal L)$ on a
+held-out split. The important distinction is:
+
+```text
+global objective G: decides whether the approximation is useful;
+additive surrogate G-tilde: makes a packet-tree search feasible.
+```
+
+The approximation must be declared before its surrogate. For a practical
+example, let $A^{\prime}=SAS^\top$ be a transformed residual-to-residual linear
+operator and retain only its within-leaf blocks:
+
+$$
+M_{\mathcal L}(A^{\prime})=
+\sum_{v\in\mathcal L}P_v A^{\prime}P_v,
+\qquad
+\Delta_{\mathcal L}=A^{\prime}-M_{\mathcal L}(A^{\prime}).
+$$
+
+Thus $\Delta_{\mathcal L}$ is the cross-packet coupling removed by the declared
+block mask. This is an *approximation* after an exact WPT coordinate change;
+the coordinate change itself does not remove any entries.
+
+#### Worked proxy: off-block energy
+
+For a fixed pruning, off-block energy has an especially useful decomposition.
+For each candidate leaf, define its outgoing cross-block energy
+
+$$
+C_{\rm off}(v)=
+\sum_{\ell}\alpha_\ell
+\left\|(I-P_v)A^{\prime}_{\ell}P_v\right\|_F^2,
+$$
+
+where $A^{\prime}_{\ell}$ is a transformed linear operator in layer $\ell$ and
+$\alpha_\ell\geq0$ declares layer importance. Since the leaf projectors are
+disjoint and sum to the identity,
+
+$$
+\sum_{v\in\mathcal L} C_{\rm off}(v)=
+\sum_{\ell}\alpha_\ell\left\|\Delta_{\mathcal L,\ell}\right\|_F^2.
+$$
+
+This equality counts directed matrix blocks exactly once: the source coordinates
+belong to one leaf $v$. Therefore, for this specific mask, squared off-block
+Frobenius energy is additive over leaves, not merely a proxy. A pure minimization
+is degenerate, however: it selects the root as one large block and removes
+nothing. Add a declared complexity term or a maximum leaf width, for example
+
+$$
+C(v)=C_{\rm off}(v)+\lambda\,\operatorname{dim}(v)^2,
+$$
+
+where the second term makes one very large dense block expensive. The resulting
+tree search optimizes this stated structure--error trade-off, not model quality.
+
+#### Worked proxy: output KL divergence
+
+Let $z(x)$ be original-model logits for a calibration input $x$, let
+$p(x)=\operatorname{softmax}(z(x))$, and let $z_{\mathcal L}(x)$ be logits after
+the declared packet-block mask. The true quality objective is
+
+$$
+G_{\rm KL}(\mathcal L)=\frac1M\sum_{m=1}^{M}
+D_{\rm KL}\!\left(p(x_m)\,\middle\|\,
+\operatorname{softmax}(z_{\mathcal L}(x_m))\right).
+$$
+
+It is not additive: a removed block may change later nonlinearities, attention,
+and logits, and different removals can interact. To obtain a local calibration
+surrogate, assign each leaf its masked-operator atom
+
+$$
+\Delta A_v=(I-P_v)A^{\prime}P_v
+$$
+
+and use the first-order logit response $r_v(x)$ obtained by propagating the
+effect of $\Delta A_v$ through the unmasked network. For small perturbations,
+the softmax KL has the quadratic approximation
+
+$$
+D_{\rm KL}\!\left(p\,\middle\|\,\operatorname{softmax}(z+\delta z)\right)
+\approx \frac12\delta z^\top F(p)\delta z,
+\qquad F(p)=\operatorname{diag}(p)-pp^\top.
+$$
+
+Dropping cross-leaf terms in
+$\delta z\approx\sum_{v\in\mathcal L}r_v(x)$ gives the additive cost
+
+$$
+C_{\rm KL}(v)=\frac{1}{2M}\sum_{m=1}^{M}
+r_v(x_m)^\top F\bigl(p(x_m)\bigr)r_v(x_m).
+$$
+
+This is useful when the local responses are small and weakly correlated. It is
+not the KL of the jointly masked model: the omitted terms
+$r_u^\top F r_v$ and higher-order nonlinear effects can be large. The selected
+pruning must therefore be evaluated with the actual masked forward pass and
+held-out $G_{\rm KL}$, including maximum-logit and loss differences.
+
+#### Worked multi-objective example
+
+Consider a width-four feature group with a Haar packet tree. Its possible
+prunings include the root $\{r\}$, two level-one packets $\{a,d\}$, and four
+level-two packets $\{a_{\mathrm a},a_{\mathrm d},d_{\mathrm a},d_{\mathrm d}\}$.
+Suppose the declared approximation is the packet-block mask above. For a
+calibration set, normalize the structural error and KL surrogate by fixed
+reference values $E_{\rm ref}$ and $K_{\rm ref}$:
+
+$$
+\widehat E_{\rm off}(\mathcal L)=
+\frac{\sum_{v\in\mathcal L}C_{\rm off}(v)}{E_{\rm ref}},
+\qquad
+\widehat G_{\rm KL}(\mathcal L)=
+\frac{\sum_{v\in\mathcal L}C_{\rm KL}(v)}{K_{\rm ref}}.
+$$
+
+The normalized terms can then share a declared multi-objective search score:
+
+$$
+C(\mathcal L)=
+0.45\,\widehat E_{\rm off}(\mathcal L)+
+0.35\,\widehat G_{\rm KL}(\mathcal L)+
+0.025\sum_{v\in\mathcal L}\operatorname{dim}(v)^2.
+$$
+
+The numbers below are illustrative dimensionless calibration values, not model
+measurements. They show the calculation and the reason to normalize before
+choosing weights.
+
+| Pruning $\mathcal L$ | Blocks | $\widehat E_{\rm off}$ | $\widehat G_{\rm KL}$ | $\sum_v\operatorname{dim}(v)^2$ | $C(\mathcal L)$ | Held-out true KL |
+|---|---:|---:|---:|---:|---:|---:|
+| $\{r\}$ | 1 | 0.00 | 0.00 | 16 | $0.45(0)+0.35(0)+0.025(16)=0.400$ | 0.00 |
+| $\{a,d\}$ | 2 | 0.20 | 0.10 | 8 | $0.45(0.20)+0.35(0.10)+0.025(8)=0.325$ | 0.12 |
+| $\{a_{\mathrm a},a_{\mathrm d},d_{\mathrm a},d_{\mathrm d}\}$ | 4 | 0.80 | 0.70 | 4 | $0.45(0.80)+0.35(0.70)+0.025(4)=0.705$ | 0.85 |
+
+The root has zero cross-block error and zero KL because it masks nothing, but
+it leaves one large dense block. The four-leaf choice gives the smallest dense
+blocks, but removes too much coupling. With the stated weights, the two-block
+pruning is the calibration candidate because $0.325$ is smallest.
+
+The final column is deliberately **not** used by the packet-tree dynamic
+program. It stands for an actual forward-pass measurement on held-out inputs.
+Here it supports the candidate, but a different held-out value could reject it;
+the surrogate is a transparent search heuristic, not proof that the selected
+pruning minimizes true KL or maximizes runtime benefit.
+
+#### Worked proxy: retention under local adaptation
+
+Suppose adaptation proposes a parameter change
+$\delta\theta=\sum_{v\in\mathcal L}\delta\theta_v$, where
+$\delta\theta_v$ is assigned to the parameters or packet blocks associated with
+leaf $v$. On a fixed prior-data calibration set, let $F_{\rm prior}$ be an
+empirical Fisher or another positive-semidefinite curvature estimate. The true
+retention quantity is the post-adaptation increase in prior loss,
+
+$$
+G_{\rm retain}(\mathcal L)=
+L_{\rm prior}(\theta+\delta\theta)-L_{\rm prior}(\theta).
+$$
+
+Its local quadratic approximation is
+
+$$
+G_{\rm retain}\approx
+g_{\rm prior}^\top\delta\theta+
+\frac12\delta\theta^\top F_{\rm prior}\delta\theta,
+\qquad g_{\rm prior}=\nabla L_{\rm prior}(\theta).
+$$
+
+Dropping interactions between leaf updates produces the additive search cost
+
+$$
+C_{\rm retain}(v)=
+g_{\rm prior}^\top\delta\theta_v+
+\frac12\delta\theta_v^\top F_{\rm prior}\delta\theta_v.
+$$
+
+Here $\delta\theta_v$ can be a small pilot update, or a declared local
+gradient-step model such as $-\eta R_v g$, where $R_v$ selects the parameters
+assigned to packet leaf $v$. At a well-converged prior solution,
+$g_{\rm prior}$ is often small, leaving the familiar Fisher-weighted drift
+term. This proxy ranks bases by estimated interference with prior behavior; it
+does not establish retention. The required test remains an actual adaptation run
+followed by held-out prior-task and new-task evaluation.
+
 For a shared basis across signals $x^{(1)},\ldots,x^{(M)}$, aggregate the node
 cost before search:
 
@@ -231,6 +482,13 @@ $$
 
 Select on one calibration split and validate on another to detect basis
 overfitting.
+
+A cost specifies what “best” means. Entropy can prefer concentrated
+activations; off-block operator energy can prefer a useful matrix layout; a
+downstream loss can prefer task quality. These objectives need not agree. In
+particular, the project should select a candidate WPT basis using declared,
+reproducible calibration data, then compare it on held-out data against original
+coordinates, a random permutation, and a random orthogonal basis.
 
 ## 7. Multidimensional and multichannel signals
 
@@ -286,6 +544,18 @@ H\in\mathbb R^{B\times T\times d},
 $$
 
 where $B$ is batch, $T$ token position, and $d$ model width.
+
+For multi-head attention it is also useful to expose a reshaped view
+$Q\in\mathbb R^{B\times T\times h\times d_h}$, where $h$ is the number of
+heads and $d=h d_h$. The axis is part of the hypothesis:
+
+| Axis | Natural WPT interpretation | Main constraint in an LLM |
+|---|---|---|
+| Batch $B$ | None in ordinary inference | Examples are independent; do not mix them. |
+| Token position $T$ | Time and scale | A transform or mask must prevent future-token leakage. |
+| Residual feature $d$ | Channel/feature packets | Channel adjacency is not given by the architecture. |
+| Attention head $h$ | Coarse groups of projections | Head partitioning and RoPE interfaces must remain well defined. |
+| Per-head feature $d_h$ | Local coordinates within one head | May alter attention geometry unless all dependent operations are compiled. |
 
 **Feature-space WPT** applies $S\in\mathbb R^{d\times d}$ on the last axis:
 
@@ -402,6 +672,30 @@ deployment objectives. Validate separately:
 5. realized kernel latency and memory.
 
 ## 10. Connection to this project's experiments
+
+The project separates three questions because they make different assumptions.
+They must not be combined into one claim without an experiment that demonstrates
+their interaction.
+
+| Track | WPT target | Immediate decision | Required gate and controls | It does not establish |
+|---|---|---|---|---|
+| [Feature-space compilation](../experiments/feature-space-compilation/experiment.md) | Residual feature coordinate $d$ | Can an existing checkpoint be re-expressed exactly and does a fixed basis expose measurable structure? | Fixed-input logit and loss equivalence before approximation; original, permutation, and random-orthogonal controls for structure. | A speedup, useful sparsity, or better continual learning. |
+| [Feature-channel neighborhoods](../experiments/feature-space-channel-neighborhoods/experiment.md) | A permutation or grouping before feature WPT | Can data-derived adjacency make the packet tree more useful and stable? | Held-out stability and comparison with identity and random orders. | That an ordering has a unique or human-semantic interpretation. |
+| [Time-scale block-causal generation](../experiments/time-scale-block-causal-generation/experiment.md) | Token position $T$ | Can a time/scale representation support a valid block-causal generation schedule? | Prefix-leakage tests and a matched strictly causal baseline. | Feature-space checkpoint rebasing or an automatic quality gain. |
+
+The cost-aware progression is the same in every track:
+
+```text
+shape and algebra checks
+  -> exact smoke test
+  -> small calibration measurement
+  -> targeted ablation
+  -> small adaptation or training run
+  -> larger confirmation or kernel work
+```
+
+Advance only when the previous stage supplies evidence worth the additional
+cost. The track documents define the concrete stopping rules and metrics.
 
 The feature-space compilation track uses WPT as a structured coordinate system.
 For an orthonormal feature transform $S$, residual-to-residual maps use
