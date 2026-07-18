@@ -80,4 +80,3 @@ Mermaid-capable Markdown preview extension and document that only if required.
 
 Stage `docs/smollm2-category-diagrams.md` and `CHANGELOG.md`, then commit with
 message `docs: add SmolLM2 category diagrams`.
-
