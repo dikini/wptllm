@@ -60,4 +60,3 @@ Run the content check, Mermaid-fence balance and parser-safe-label checks,
 VS Code math-delimiter check, and `git diff --check`. Update the changelog
 under `Changed`, then commit with message
 `docs: explain causal training and generation`.
-
