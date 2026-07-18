@@ -42,6 +42,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   with plain-language labels that render in VS Code Markdown Preview.
 - Removed display-math wrappers from `tikz-cd` blocks to match TikZJax's
   documented Markdown block form.
+- Replaced TikZJax-sensitive `\text` and `\operatorname` labels in the functor
+  and residual diagrams with basic math-mode labels.
 
 ## [0.1.0] - 2026-07-15
 

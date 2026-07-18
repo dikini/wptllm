@@ -58,7 +58,7 @@ $L_\ell:H_T\to H_T$. It therefore maps both objects and arrows.
 \usepackage{tikz-cd}
 \begin{document}
 \begin{tikzcd}[column sep=large, row sep=large]
-\ell \arrow[r, "\text{in }\mathbf L_{24}"] \arrow[d, "\mathcal H"'] & \ell+1 \arrow[d, "\mathcal H"] \\
+\ell \arrow[r, "\mathbf L_{24}"] \arrow[d, "\mathcal H"'] & \ell+1 \arrow[d, "\mathcal H"] \\
 H_T \arrow[r, "L_\ell"'] & H_T
 \end{tikzcd}
 \end{document}
@@ -136,11 +136,11 @@ same addition node.
 \begin{document}
 \begin{tikzpicture}[>=stealth]
   \node (h) at (0, 0) {$h$};
-  \node[draw, rounded corners] (norm1) at (2, 0) {$\operatorname{RMSNorm}_{\ell,1}$};
+  \node[draw, rounded corners] (norm1) at (2, 0) {$\mathrm{RMSNorm}_{\ell,1}$};
   \node[draw, rounded corners] (attn) at (5, 0) {$\Delta_{\mathrm{attn}}(h)$};
   \node[draw, circle] (plus1) at (8, 0) {$+$};
   \node (u) at (9.5, 0) {$u$};
-  \node[draw, rounded corners] (norm2) at (12, 0) {$\operatorname{RMSNorm}_{\ell,2}$};
+  \node[draw, rounded corners] (norm2) at (12, 0) {$\mathrm{RMSNorm}_{\ell,2}$};
   \node[draw, rounded corners] (mlp) at (15, 0) {$\Delta_{\mathrm{mlp}}(u)$};
   \node[draw, circle] (plus2) at (18, 0) {$+$};
   \node (hout) at (19.5, 0) {$h_{\ell+1}$};
