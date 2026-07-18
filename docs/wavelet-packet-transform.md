@@ -431,7 +431,62 @@ It is not a mere re-basing of a standard causal checkpoint because attention
 masking and nonlinear operations do not generally commute with a temporal basis
 change.
 
-## 11. Reference reading
+## 11. Related work: Learnable Multi-Scale Wavelet Transformer
+
+Kiruluta, Burity, and Williams propose a *Learnable Multi-Scale Wavelet
+Transformer* (LMWT) that replaces self-attention with a learned Haar-like
+sequence-mixing module [9]. The module pairs adjacent token representations,
+forms learned approximation and detail vectors, recursively processes the
+approximation branch, and aggregates multi-scale coefficients. The paper reports
+a linear-in-sequence-length module cost and a WMT16 English--German comparison
+against a self-attention baseline.
+
+This is useful related work, but it addresses a different problem from
+feature-space checkpoint compilation:
+
+| Question | This project's feature-space track | LMWT preprint |
+|---|---|---|
+| Starting point | Existing checkpoint | Model trained with a new mixing module |
+| Transform axis | Residual feature/channel axis | Token/sequence axis |
+| Main objective | Exact re-basing, then structured approximation | Replace quadratic attention |
+| Transform family | Fixed WPT basis, packet pruning, later constrained lifting | Learned Haar-like decomposition |
+| Perfect reconstruction | Important for exact compilation | Not required by the proposed forward feature extractor |
+| Packet best basis | Central possible method | Not used; only the approximation branch is recursively processed |
+
+The paper is therefore **not** evidence that an existing LLM can be compiled
+into a useful WPT feature basis. Its learned forward and inverse parameters are
+not constrained in the paper to be an orthogonal or perfect-reconstruction
+transform, and its recursive approximation-only hierarchy is closer to a
+learnable DWT-style mixer than a full WPT packet library.
+
+It can still inform later work in three ways:
+
+1. **Time-scale baseline.** The time-scale block-causal track can compare a
+   fixed Haar mixer, a constrained learnable lifting/WPT mixer, and attention on
+   matched small models.
+2. **Ablation pattern.** Compare fixed versus learned filters, number of scales,
+   coefficient aggregation, quality, memory, and measured prefill/decode cost.
+3. **Coefficient diagnostics.** Its per-scale coefficient visualizations suggest
+   useful summaries: scale energy, entropy, sparsity, cross-scale covariance,
+   and task-conditioned activation profiles.
+
+There are important requirements before using LMWT-style ideas in our
+experiments. A decoder must be demonstrably causal: a recursive transform over a
+teacher-forced full target sequence can expose future tokens unless it uses
+causal filters, completed blocks, masked/noisy slots, or a valid block-generation
+schedule. The preprint's attention-free decoder description does not itself
+establish an autoregressive no-leakage guarantee. Any reproduction or extension
+must include adversarial leakage tests, matched parameter/training budgets, and
+wall-clock measurements over several sequence lengths; a theoretical $O(T)$
+module cost alone is insufficient.
+
+For learned basis work in the feature-space track, use the paper as motivation
+for learning structured local transforms, but retain explicit constraints on
+invertibility, conditioning, locality, and—when required—orthogonality. Those
+constraints are what preserve the distinction between a learnable WPT basis and
+a generic learned sequence mixer.
+
+## 12. Reference reading
 
 All links below are directly readable online; the first two are downloadable
 PDFs of foundational papers.
@@ -457,3 +512,6 @@ PDFs of foundational papers.
    [Open arXiv paper](https://arxiv.org/abs/2101.06707).
 8. R. Wang, “The Principal Component Transform.”
    [Open tutorial](https://pages.hmc.edu/ruye/e161/lectures/pca/node3.html).
+9. A. Kiruluta, P. Burity, and S. Williams, “Learnable Multi-Scale Wavelet
+   Transformer: A Novel Alternative to Self-Attention,” arXiv:2504.08801,
+   version 1, 2025. [Open HTML paper](https://arxiv.org/html/2504.08801v1).
