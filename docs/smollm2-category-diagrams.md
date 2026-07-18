@@ -1,4 +1,4 @@
-# SmolLM2-1.7B through commutative diagrams
+# SmolLM2-1.7B + WPT through diagrams
 
 This note presents the concrete [HuggingFaceTB/SmolLM2-1.7B configuration](https://huggingface.co/HuggingFaceTB/SmolLM2-1.7B/blob/main/config.json) as editable diagrams and equations. It is a coordinate-level aid for understanding the model and a precise vocabulary for later WPT compilation experiments; it does not claim that WPT improves this checkpoint.
 
