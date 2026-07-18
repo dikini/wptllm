@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   equations.
 - Design record for symbolic TikZ companions to the SmolLM2 process diagrams.
 - Design record for a causal training-versus-generation explanation.
+- Design record for fold/unfold/build and reverse-mode automatic-differentiation
+  intuition.
 
 - Project guidance for reproducible, documented, cost-aware WPT-LLM research.
 - Separate experiment plans for feature-space WPT checkpoint compilation and
