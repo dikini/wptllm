@@ -137,11 +137,11 @@ same addition node.
 \begin{tikzpicture}[>=stealth]
   \node (h) at (0, 0) {$h$};
   \node[draw, rounded corners] (norm1) at (2, 0) {$\mathrm{RMSNorm}_{\ell,1}$};
-  \node[draw, rounded corners] (attn) at (5, 0) {$\Delta_{\mathrm{attn}}(h)$};
+  \node[draw, rounded corners] (attn) at (5, 0) {$\Delta_{\mathrm{attn}}(x)$};
   \node[draw, circle] (plus1) at (8, 0) {$+$};
   \node (u) at (9.5, 0) {$u$};
   \node[draw, rounded corners] (norm2) at (12, 0) {$\mathrm{RMSNorm}_{\ell,2}$};
-  \node[draw, rounded corners] (mlp) at (15, 0) {$\Delta_{\mathrm{mlp}}(u)$};
+  \node[draw, rounded corners] (mlp) at (15, 0) {$\Delta_{\mathrm{mlp}}(y)$};
   \node[draw, circle] (plus2) at (18, 0) {$+$};
   \node (hout) at (19.5, 0) {$h_{\ell+1}$};
   \draw[->] (h) -- (norm1);
@@ -159,13 +159,19 @@ same addition node.
 ```
 
 $$
-u=h+\Delta_{\mathrm{attn}}(h),
+x=\operatorname{RMSNorm}_{\ell,1}(h),
 \qquad
-h_{\ell+1}=u+\Delta_{\mathrm{mlp}}(u).
+u=h+\Delta_{\mathrm{attn}}(x),
 $$
 
-In the detailed equation below, $\Delta_{\mathrm{attn}}(h)=aW_{o,\ell}$ and
-$\Delta_{\mathrm{mlp}}(u)=\bigl(\operatorname{SiLU}(yW_{\mathrm{gate},\ell})\odot(yW_{\mathrm{up},\ell})\bigr)W_{\mathrm{down},\ell}$.
+$$
+y=\operatorname{RMSNorm}_{\ell,2}(u),
+\qquad
+h_{\ell+1}=u+\Delta_{\mathrm{mlp}}(y).
+$$
+
+In the detailed equation below, $\Delta_{\mathrm{attn}}(x)=aW_{o,\ell}$ and
+$\Delta_{\mathrm{mlp}}(y)=\bigl(\operatorname{SiLU}(yW_{\mathrm{gate},\ell})\odot(yW_{\mathrm{up},\ell})\bigr)W_{\mathrm{down},\ell}$.
 
 For layer $\ell$, suppressing sequence and head reshapes, let
 
