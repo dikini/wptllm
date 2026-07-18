@@ -35,6 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Reorganized the SmolLM2 diagram note as a data-to-computation-to-geometry
+  teaching narrative, with explicit token/feature spaces and axis meanings.
 - Expanded the SmolLM2 diagram reference with paired pseudo-functional
   programs and equations for teacher-forced training, generation, and
   reverse-mode automatic differentiation.
