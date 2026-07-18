@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Design record for fold/unfold/build and reverse-mode automatic-differentiation
   intuition.
 - Design record for pseudo-functional readings of the causal model equations.
+- Design record for restructuring the WPT chapter around experiment decisions.
 - Design record for restructuring the SmolLM2 note as a data-to-geometry
   teaching narrative.
 
