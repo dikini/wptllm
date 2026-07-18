@@ -36,6 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Added a WPT-reference exposition on polar-coordinate coding, its limits for
+  exact compilation, and a staged future polar-packet rate--distortion track.
 - Added an illustrative WPT best-basis example that combines normalized
   cross-block energy, calibration KL, and block-size costs while keeping
   held-out true KL outside the search objective.

@@ -636,7 +636,126 @@ as data change. WPT trades unconstrained covariance optimality for a structured,
 local, efficiently implemented transform family. PCA is also called the KLT,
 Hotelling transform, or eigenvector transform [8].
 
-## 9. Practical choices and pitfalls
+## 9. Polar coordinates and packet bases
+
+Polar coordinates offer another view of a vector, but they are not an
+orthogonal linear basis change. For $x\ne0$ in $\mathbb R^m$, a polar map has
+the schematic form
+
+$$
+\operatorname{Polar}(x)=(r,\theta),
+\qquad r=\|x\|_2,
+\qquad \theta\in S^{m-1}.
+$$
+
+It can be invertible away from singular cases, but it does not preserve vector
+addition:
+
+$$
+\operatorname{Polar}(x+y)\ne
+\operatorname{Polar}(x)+\operatorname{Polar}(y).
+$$
+
+This is the decisive difference from $c=Sx$. An orthogonal WPT permits fixed
+linear weights to be re-expressed with products such as $SWS^\top$. There is
+no corresponding fixed matrix compilation through a polar map. A polar
+representation therefore changes the model computation, not merely its linear
+coordinates.
+
+### Recommended use: polar statistics within WPT packets
+
+The lowest-risk combination keeps WPT as the feature-space coordinate system.
+For a candidate packet leaf $v$, first compute its linear coefficients $c_v$,
+then represent only that local vector in polar form:
+
+$$
+x\xrightarrow{S_{\mathcal L}}\{c_v:v\in\mathcal L\}
+\xrightarrow{\operatorname{Polar}\ \text{per leaf}}
+\{(r_v,\theta_v):v\in\mathcal L\}.
+$$
+
+The polar representation can define a rate--distortion-aware best-basis cost,
+without being inserted into the original model's forward pass. For a declared
+per-packet quantizer $Q_v$, one example is
+
+$$
+C_{\rm polar}(v)=
+\lambda_R\widehat R\bigl(Q_v(r_v,\theta_v)\bigr)+
+\lambda_D\frac{\|c_v-\widehat c_v\|_2^2}{D_{\rm ref}}+
+\lambda_S C_{\rm struct}(v),
+$$
+
+where $\widehat c_v$ is the decoded coefficient block and
+$C_{\rm struct}$ can be an off-block, KL-surrogate, or block-size term. The
+cost remains suitable for a packet-tree search when rate, distortion, and the
+structural term are measured independently per candidate leaf. The true
+end-to-end quality and memory objective must still be evaluated after selecting
+a pruning.
+
+This construction has three possible advantages:
+
+1. it asks whether a proposed WPT block has a favorable local rate--distortion
+   curve, rather than only whether its Cartesian coefficients are sparse;
+2. it can guide bit allocation or codec selection inside selected blocks;
+3. it separates an exact WPT compilation experiment from a later lossy storage
+   or activation/KV-cache coding experiment.
+
+PolarQuant is relevant here as an example of recursive polar coding and
+quantization after preconditioning [10]. It groups coordinates recursively into
+radii and angles, and uses the resulting angle distributions to design
+quantizers. Its result motivates measuring polar rate and distortion within
+packet blocks; it is not evidence that those blocks are semantically meaningful.
+
+### Alternatives and concerns
+
+The reverse composition,
+
+$$
+x\xrightarrow{\operatorname{Polar}}(r,\theta)
+\xrightarrow{\operatorname{WPT}}\widetilde c,
+$$
+
+is a possible nonlinear architecture, but not feature-space checkpoint
+compilation. It introduces angular periodicity, coordinate singularities near
+$r=0$, and a new imposed notion of adjacency among angles. Its nonlinearities
+also prevent a single precompiled replacement for the original Transformer
+weights. Treat it as a train-or-adapt-and-evaluate proposal, with its own causal
+and numerical tests.
+
+PolarQuant-style random preconditioning supplies a useful control, not a
+neighborhood-discovery method. A random orthogonal rotation can preserve norms
+and inner products while deliberately making coordinate identity uninformative.
+Applied across proposed WPT blocks, it can erase the locality the packet basis
+is intended to test. Use whole-vector random rotations as a strong null
+baseline; if a rotation is used in a codec, restrict it within an already
+selected packet block and compare its benefit against the added kernel cost.
+
+Other practical concerns are metadata and runtime overhead, angle-codebook
+stability under distribution drift, the behavior of low-radius vectors, and
+interactions between quantization errors from several blocks. A lower local
+polar coding cost does not imply lower model KL, faster decode, or improved
+continual learning.
+
+### Recommended future track: polar-packet rate--distortion
+
+Create a separate `polar-packet-rate-distortion` track only after the
+feature-space compilation track demonstrates exact numerical re-expression and
+the channel-neighborhood track demonstrates held-out structure beyond identity,
+random-permutation, and random-orthogonal controls. It should proceed in stages:
+
+| Stage | Smallest decision | Required comparison or gate |
+|---|---|---|
+| P0 | Can polar per-packet statistics be measured reproducibly? | Fixed calibration data; Cartesian entropy and rate--distortion controls. |
+| P1 | Does a polar cost select a stable WPT pruning? | Held-out basis stability and all channel-order controls. |
+| P2 | Does selected-block coding help at equal memory? | Cartesian per-block quantization, whole-head PolarQuant-style baseline, output KL, and cache/activation memory. |
+| P3 | Is there realized systems value? | End-to-end prefill/decode latency and metadata/kernel accounting. |
+| P4 | Is polar-before-WPT worth architectural work? | Only after P0--P3; train/adapt a small model with causal and numerical controls. |
+
+The track's first claim would be about compression or approximation efficiency,
+not semantic channel meaning. Any claim about local learning or better inference
+must be tested separately against the project baselines.
+
+## 10. Practical choices and pitfalls
 
 ### Boundary handling
 
@@ -671,7 +790,7 @@ deployment objectives. Validate separately:
 4. retention under local adaptation;
 5. realized kernel latency and memory.
 
-## 10. Connection to this project's experiments
+## 11. Connection to this project's experiments
 
 The project separates three questions because they make different assumptions.
 They must not be combined into one claim without an experiment that demonstrates
@@ -725,7 +844,7 @@ It is not a mere re-basing of a standard causal checkpoint because attention
 masking and nonlinear operations do not generally commute with a temporal basis
 change.
 
-## 11. Related work: Learnable Multi-Scale Wavelet Transformer
+## 12. Related work: Learnable Multi-Scale Wavelet Transformer
 
 Kiruluta, Burity, and Williams propose a *Learnable Multi-Scale Wavelet
 Transformer* (LMWT) that replaces self-attention with a learned Haar-like
@@ -780,7 +899,7 @@ invertibility, conditioning, locality, and—when required—orthogonality. Thos
 constraints are what preserve the distinction between a learnable WPT basis and
 a generic learned sequence mixer.
 
-## 12. Reference reading
+## 13. Reference reading
 
 All links below are directly readable online; the first two are downloadable
 PDFs of foundational papers.
@@ -809,3 +928,6 @@ PDFs of foundational papers.
 9. A. Kiruluta, P. Burity, and S. Williams, “Learnable Multi-Scale Wavelet
    Transformer: A Novel Alternative to Self-Attention,” arXiv:2504.08801,
    version 1, 2025. [Open HTML paper](https://arxiv.org/html/2504.08801v1).
+10. I. Han, P. Kacham, A. Karbasi, V. Mirrokni, and A. Zandieh, “PolarQuant:
+    Quantizing KV Caches with Polar Transformation,” arXiv:2502.02617,
+    version 1, 2025. [Open HTML paper](https://arxiv.org/html/2502.02617v1).
