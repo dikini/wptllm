@@ -30,6 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Expanded the SmolLM2 diagram reference with a causal training and
+  autoregressive-generation explanation.
 - Expanded the SmolLM2 category-diagram reference with a beginner-oriented
   terminology glossary and symbolic TikZ commutative diagrams.
 - Added a critical LMWT related-work note, evaluation implications, and paper

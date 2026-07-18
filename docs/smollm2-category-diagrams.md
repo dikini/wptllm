@@ -104,6 +104,92 @@ $$
 
 Thus, when $W_H=W_E^\top$, tying is retained exactly: $(W_E^S)^\top=W_H^S$. These boundary transforms put the embedding output into WPT coordinates and map WPT-coordinate final residuals back to vocabulary logits.
 
+## Causal prediction: training and generation
+
+The decoder receives a supplied sequence of token IDs $x_{1:T}$ and produces
+one logit vector at every position, $z_{1:T}$. Its next-token distribution at
+position $t$ is
+
+$$
+p_\Theta(x_{t+1}\mid x_{1:t})=\operatorname{softmax}(z_t),
+$$
+
+where $\Theta$ denotes all learned parameters. The causal mask allows position
+$t$ to use only $x_{1:t}$, never a later token. When the entire input sequence
+is already known, however, all positions can still be evaluated in parallel:
+causality restricts *dependencies*, not the hardware execution schedule.
+
+### Training
+
+During training, a dataset supplies both the input prefix tokens and the
+**shifted targets**. For example, inputs $x_{1:T}$ have targets
+$x_{2:T+1}$. The model never samples those targets; this is commonly called
+teacher forcing.
+
+```mermaid
+flowchart LR
+  data[Dataset sequence] --> split[Input tokens and shifted targets]
+  split --> forward[Causal forward pass all positions]
+  forward --> ce[Per position cross entropy]
+  ce --> loss[Mean loss]
+  loss --> back[Back propagation]
+  back --> opt[Optimizer update]
+  opt --> theta[Updated Theta]
+```
+
+The mean next-token cross-entropy loss is
+
+$$
+\mathcal{L}(\Theta)=-\frac{1}{T}\sum_{t=1}^{T}
+\log p_\Theta(x_{t+1}\mid x_{1:t}),
+\qquad
+\Theta\leftarrow\operatorname{Optimizer}\!\left(\Theta,
+\nabla_\Theta\mathcal{L}\right).
+$$
+
+Thus teacher forcing can evaluate every position and its target in parallel,
+then use back-propagation and an optimizer to update $\Theta$.
+
+### Generation
+
+Generation begins from a prompt or other current prefix. The model evaluates
+that prefix, selects only the final-position prediction, appends it, and repeats
+until an end-of-sequence token or the chosen maximum length.
+
+```mermaid
+flowchart LR
+  prompt[Prompt] --> prefix[Current prefix]
+  prefix --> forward[Causal forward pass current prefix]
+  forward --> logits[Last position logits]
+  logits --> choose[Select token]
+  choose --> append[Append selected token]
+  append --> updated[Updated prefix]
+  updated --> stop{End of sequence or max length}
+  stop -->|No| prefix
+  stop -->|Yes| done[Generated sequence]
+```
+
+For a selection policy $q$, the selected token is
+
+$$
+x_{T+1}=\operatorname{Select}_q\!\left(\operatorname{softmax}(z_T)\right).
+$$
+
+Here $q$ can be a deterministic greedy argmax policy or a stochastic sampler,
+such as one using temperature and top-$p$ filtering. When the stop check is
+negative, the updated prefix becomes the next current prefix.
+
+Ordinary inference keeps $\Theta$ fixed: there is no loss, back-propagation,
+or parameter update. A **KV cache** stores the key and value projections from
+earlier positions in each layer. After the prompt prefill, a new iteration
+processes the new token rather than recomputing the old prefix. It gives the
+same causal result as an uncached evaluation, apart from ordinary
+numerical/runtime implementation differences.
+
+In short, training and generation share the same causal model and mask.
+Training uses dataset targets, losses, gradients, and updates; generation uses
+selected and appended tokens, with no updates.
+
 ## One pre-norm decoder layer
 
 ```mermaid
