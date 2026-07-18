@@ -25,4 +25,3 @@ Use Mermaid for the readable process/control-flow views and nearby VS
 Code-compatible equations for exact notation. Existing component and TikZ
 diagrams remain unchanged; the new section explains how they are coordinated
 across a sequence and across successive generation steps.
-

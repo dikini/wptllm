@@ -21,4 +21,3 @@ The programs will make evaluation order and data flow explicit but will not
 specify batching, distributed execution, mixed precision, checkpointing
 policy, or a concrete optimizer implementation. The existing diagrams and
 equations remain the source of mathematical detail.
-

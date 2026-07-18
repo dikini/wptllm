@@ -26,4 +26,3 @@ The section is intuitive and operational, not a formal treatment of
 catamorphisms or anamorphisms. It will distinguish an abstract reverse-mode
 rule from implementation details such as memory-saving checkpointing, fused
 kernels, or distributed training.
-

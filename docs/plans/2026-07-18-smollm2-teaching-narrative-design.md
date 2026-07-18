@@ -33,4 +33,3 @@ the later WPT/category-theory perspective.
   first appears.
 - Keep exact coordinate-change claims distinct from architecture-preserving
   approximations and empirical claims.
-

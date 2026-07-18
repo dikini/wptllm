@@ -19,4 +19,3 @@ The addition explains terminology already used in the note; it does not add a
 second tutorial, alter the categorical claims, or introduce new model behavior.
 It will preserve Mermaid-safe plain-language labels and VS Code-compatible math
 markup.
-

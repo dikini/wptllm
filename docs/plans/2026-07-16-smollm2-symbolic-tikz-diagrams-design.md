@@ -35,4 +35,3 @@ the diagrams do not replace the existing process diagrams or prose.
 Verify the TikZ block structure, required `tikz-cd` package declarations, and
 the matching mathematical labels statically. Visual rendering is checked in VS
 Code Markdown Preview using the installed extension.
-
